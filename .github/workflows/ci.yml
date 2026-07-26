@@ -27,6 +27,8 @@ jobs:
       - name: Build
         env:
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL || vars.DOMAIN_PUBLIC_URL || secrets.PUBLIC_URL || vars.IP_PUBLIC_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          TEAM_NAME: codebreak
         run: npm run build
         working-directory: team-site
 
