@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: request-organizer-deploy
@@ -62,6 +63,69 @@ jobs:
             echo "source_run_id=$source_run_id"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Resolve CI run for artifact
+        id: ci_run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.request.outputs.sha }}
+          WORKFLOW_RUN_EVENT_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          run_id="$WORKFLOW_RUN_EVENT_ID"
+
+          if [ -z "$run_id" ]; then
+            run_id=$(gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&status=success&per_page=1" \
+              --jq '.workflow_runs[0].id // empty')
+          fi
+
+          if [ -z "$run_id" ]; then
+            echo "No successful CI run found for sha $SHA"
+            exit 1
+          fi
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist-${{ steps.request.outputs.sha }}
+          path: ./release-candidate
+          run-id: ${{ steps.ci_run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record artifact identity
+        id: artifact
+        env:
+          SHA: ${{ steps.request.outputs.sha }}
+          CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          artifact_name="site-dist-${SHA}"
+
+          printf '{"task":"T03","artifact":"%s","commit":"%s","ciRunId":"%s"}\n' \
+            "$artifact_name" "$SHA" "$CI_RUN_ID" > release-candidate/artifact.json
+
+          cat release-candidate/artifact.json
+
+          {
+            echo "### Deploy artifact"
+            echo ""
+            echo "- Artifact: \`${artifact_name}\`"
+            echo "- Source CI run: \`${CI_RUN_ID}\`"
+            echo "- Commit: \`${SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest-${{ steps.request.outputs.sha }}
+          path: release-candidate/artifact.json
+
       - name: Request deploy from organizer deployer
         env:
           DEPLOYER_DISPATCH_TOKEN: ${{ secrets.DEPLOYER_DISPATCH_TOKEN }}
@@ -70,6 +134,8 @@ jobs:
           TEAM_SHA: ${{ steps.request.outputs.sha }}
           TEAM_BRANCH: ${{ steps.request.outputs.branch }}
           SOURCE_RUN_ID: ${{ steps.request.outputs.source_run_id }}
+          ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
+          ARTIFACT_CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
         run: |
           set -euo pipefail
 
@@ -90,6 +156,8 @@ jobs:
                   "sha": os.environ["TEAM_SHA"],
                   "branch": os.environ["TEAM_BRANCH"],
                   "source_run_id": os.environ["SOURCE_RUN_ID"],
+                  "artifact_name": os.environ["ARTIFACT_NAME"],
+                  "artifact_ci_run_id": os.environ["ARTIFACT_CI_RUN_ID"],
               },
           }
 
