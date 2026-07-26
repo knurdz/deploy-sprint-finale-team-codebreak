@@ -15,12 +15,20 @@ const domainConnected = Boolean(publicUrl && publicUrl.startsWith('https://'));
 const web3FormsConfigured = Boolean(process.env.VITE_WEB3FORMS_ACCESS_KEY);
 const showInsights = process.env.VITE_FEATURE_SHOW_INSIGHTS === 'true';
 
+const featureFlags = {
+  task: 'T15',
+  flagName: 'FEATURE_SHOW_INSIGHTS',
+  showInsights,
+  redacted: true,
+};
+
 const status = {
   task: 'T01',
   team: teamName,
   commit: commitSha,
   releaseId,
   deployTime,
+  tasks: ['T01', 'T02', 'T05', 'T10', 'T15'],
   publicUrlConfigured: Boolean(publicUrl),
   secretsRedacted: true,
   domain: {
@@ -31,20 +39,19 @@ const status = {
     provider: 'web3forms',
     configured: web3FormsConfigured,
   },
-  featureFlags: {
-    task: 'T15',
-    showInsights,
-    valueRedacted: true,
-  },
+  featureFlags,
 };
 
 const statusDir = join(distDir, 'status');
 const healthDir = join(distDir, 'health');
+const configDir = join(distDir, 'config');
 mkdirSync(statusDir, { recursive: true });
 mkdirSync(healthDir, { recursive: true });
+mkdirSync(configDir, { recursive: true });
 
 writeFileSync(join(statusDir, 'index.html'), JSON.stringify(status));
 writeFileSync(join(distDir, 'status.json'), JSON.stringify(status, null, 2));
 writeFileSync(join(healthDir, 'index.html'), 'ok');
+writeFileSync(join(configDir, 'feature-flags.json'), JSON.stringify(featureFlags));
 
-console.log('Generated /status and /health for', commitSha);
+console.log('Generated /status, /health, and /config/feature-flags.json for', commitSha);
