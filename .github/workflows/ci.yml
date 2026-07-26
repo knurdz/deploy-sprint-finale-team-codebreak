@@ -106,3 +106,46 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/api/weather)
           test "$code" = "503"
         working-directory: server
+
+  docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t "deploy-sprint/codebreak:${{ github.sha }}" team-site
+
+      - name: Verify image serves the app
+        run: |
+          set -euo pipefail
+          docker run -d --name t14-smoke -p 8080:80 "deploy-sprint/codebreak:${{ github.sha }}"
+
+          for _ in $(seq 1 20); do
+            if curl -sf http://localhost:8080/health/ > /dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          echo "GET /"
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)
+          test "$code" = "200"
+
+          echo "GET /health/"
+          curl -sf http://localhost:8080/health/
+
+          echo "GET /status/"
+          curl -sf http://localhost:8080/status/
+
+          docker stop t14-smoke
+
+      - name: Record image evidence
+        run: |
+          {
+            echo "### Docker image evidence"
+            echo ""
+            echo "- Tag: \`deploy-sprint/codebreak:${{ github.sha }}\`"
+            echo "- Image ID: \`$(docker image inspect "deploy-sprint/codebreak:${{ github.sha }}" --format '{{.Id}}')\`"
+            echo "- Size: \`$(docker image inspect "deploy-sprint/codebreak:${{ github.sha }}" --format '{{.Size}}')\` bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
