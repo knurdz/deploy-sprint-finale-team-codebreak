@@ -35,7 +35,7 @@ Use this section for short public notes and links. Full task instructions and ch
 | T03 |  |  | `deploy.yml` downloads the CI-built `site-dist-<sha>` artifact (via `actions/download-artifact@v4`, resolving the source CI run from the `workflow_run` event or the GitHub API) instead of rebuilding, writes `release-candidate/artifact.json` recording task/artifact/commit/CI-run-id, publishes it as job summary + `release-manifest-<sha>` artifact, and forwards the artifact identity in the organizer dispatch payload. |
 | T04 |  |  | New `rollback.yml` (`workflow_dispatch` with required `release_ref` input) resolves a tag/SHA/artifact-id to a commit on `main`, locates its successful CI run, downloads the matching `site-dist-<sha>` artifact, records a rollback manifest (job summary + `rollback-manifest-<sha>-<run>` artifact), and dispatches the same organizer redeploy request used by `deploy.yml`, pointed at the known-good commit. |
 | T05 |  |  |  |
-| T06 |  |  |  |
+| T06 |  |  | `ci.yml` already ran on `pull_request` + push to `main` with Node 20, `npm ci`, `npm run build`, and `upload-artifact` (`site-dist-<sha>`) from prior tasks; added `permissions: contents: read` (least privilege) and a `concurrency` group with `cancel-in-progress` so stale runs on the same ref don't linger. `deploy.yml` already depends on this build via its `workflow_run: ["CI"]` trigger gated on `conclusion == 'success'`, unchanged here. |
 | T07 |  |  |  |
 | T08 |  |  |  |
 | T09 |  |  |  |
