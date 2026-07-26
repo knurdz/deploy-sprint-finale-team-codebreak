@@ -42,7 +42,7 @@ Use this section for short public notes and links. Full task instructions and ch
 | T10 |  |  |  |
 | T11 |  |  |  |
 | T12 |  |  |  |
-| T13 |  |  |  |
+| T13 |  |  | Applied organizer `task-assets/feature-bundle` files into `team-site/src/components/ReleaseReadiness.tsx`, `team-site/src/data/releaseReadiness.ts`, and `team-site/scripts/check-release-readiness.mjs`; removed the `AI-REVIEW-MARKER` comment; imported and rendered `<ReleaseReadiness />` in `App.tsx`. Wired `check-release-readiness.mjs` into `team-site/package.json`'s `build` script (`check:readiness`), so it runs automatically on every `npm run build`, including CI, and fails loudly if the component is ever removed from `App.tsx` — verified both the pass and fail cases locally. |
 | T14 |  |  |  |
 | T15 |  |  |  |
 | T16 |  |  |  |
