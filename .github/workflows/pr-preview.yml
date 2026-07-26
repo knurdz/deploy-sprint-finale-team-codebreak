@@ -1,0 +1,44 @@
+name: PR Preview
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: team-site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: team-site
+
+      - name: Build PR version
+        run: npm run build
+        working-directory: team-site
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-${{ github.event.pull_request.head.sha }}
+          path: team-site/dist
+
+      - name: Write preview summary
+        run: |
+          echo "## T11 Preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PR: #${{ github.event.pull_request.number }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: ${{ github.event.pull_request.head.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact: preview-${{ github.event.pull_request.head.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Download this artifact from the Actions run to preview this PR's build." >> "$GITHUB_STEP_SUMMARY"
