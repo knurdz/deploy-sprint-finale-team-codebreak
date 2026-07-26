@@ -44,3 +44,47 @@ jobs:
         with:
           name: site-dist-${{ github.sha }}
           path: team-site/dist
+
+  server-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Start server and check routes
+        run: |
+          set -euo pipefail
+          APP_PORT=8099 node index.js &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+
+          for _ in $(seq 1 20); do
+            if curl -sf http://localhost:8099/health > /dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          echo "GET /health"
+          curl -sf http://localhost:8099/health
+
+          echo "GET /status"
+          status=$(curl -sf http://localhost:8099/status)
+          echo "$status"
+          echo "$status" | grep -q '"provider":"openweather"'
+
+          echo "GET /api/weather (no key configured, expect 503)"
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/api/weather)
+          test "$code" = "503"
+        working-directory: server

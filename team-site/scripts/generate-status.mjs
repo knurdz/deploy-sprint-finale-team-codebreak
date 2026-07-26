@@ -10,6 +10,9 @@ const commitSha = process.env.GITHUB_SHA || 'local-dev';
 const releaseId = process.env.GITHUB_RUN_ID || `local-${Date.now()}`;
 const deployTime = new Date().toISOString();
 
+const publicUrl = process.env.VITE_PUBLIC_URL || null;
+const domainConnected = Boolean(publicUrl && publicUrl.startsWith('https://'));
+
 const statusDir = join(distDir, 'status');
 const healthDir = join(distDir, 'health');
 mkdirSync(statusDir, { recursive: true });
@@ -21,6 +24,10 @@ const status = {
   commit: commitSha,
   releaseId,
   deployTime,
+  domain: {
+    publicUrl,
+    connected: domainConnected,
+  },
 };
 
 writeFileSync(join(statusDir, 'index.html'), JSON.stringify(status));
