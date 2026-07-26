@@ -102,9 +102,16 @@ jobs:
           status=$(curl -sf http://localhost:8099/status)
           echo "$status"
           echo "$status" | grep -q '"provider":"openweather"'
+          echo "$status" | grep -q '"provider":"resend"'
+          echo "$status" | grep -q '"secretRedacted":true'
 
           echo "GET /api/weather (no key configured, expect 503)"
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/api/weather)
+          test "$code" = "503"
+
+          echo "POST /api/alert (no key configured, expect 503)"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8099/api/alert \
+            -H "Content-Type: application/json" -d '{"subject":"smoke test"}')
           test "$code" = "503"
         working-directory: server
 
