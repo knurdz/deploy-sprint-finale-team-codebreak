@@ -24,16 +24,34 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: team-site/package-lock.json
+
+      - name: Cache npm dependencies
+        id: npm-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('team-site/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install dependencies
         run: npm ci
         working-directory: team-site
 
+      - name: Report dependency cache status
+        run: |
+          {
+            echo "### Dependency cache"
+            echo ""
+            echo "- Cache key: \`${{ runner.os }}-npm-${{ hashFiles('team-site/package-lock.json') }}\`"
+            echo "- Cache hit: \`${{ steps.npm-cache.outputs.cache-hit }}\`"
+            echo "- Install command: \`npm ci\` (lockfile-strict, unchanged)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build
         env:
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL || vars.DOMAIN_PUBLIC_URL || secrets.PUBLIC_URL || vars.IP_PUBLIC_URL }}
+          VITE_WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
           GITHUB_SHA: ${{ github.sha }}
           TEAM_NAME: codebreak
         run: npm run build

@@ -410,6 +410,102 @@ h3 {
   font-weight: 800;
 }
 
+.providerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.providerBadge.ok {
+  background: #e2f2d8;
+  color: #2f6b3a;
+}
+
+.providerBadge.off {
+  background: #f3e3d3;
+  color: #93511f;
+}
+
+.formNotice {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #ded7ca;
+  border-radius: 8px;
+  background: #fbf6ec;
+  color: #526057;
+  line-height: 1.5;
+}
+
+.formNotice code {
+  font-size: 0.85em;
+}
+
+.contactForm {
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+}
+
+.contactForm label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  color: #526057;
+}
+
+.contactForm input,
+.contactForm textarea {
+  padding: 10px 12px;
+  border: 1px solid #d9d1c2;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #17201b;
+  resize: vertical;
+}
+
+.contactForm input:disabled,
+.contactForm textarea:disabled {
+  background: #f0ece3;
+  color: #94897a;
+}
+
+.contactForm button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 0 20px;
+  min-height: 44px;
+  border-radius: 8px;
+  background: #17201b;
+  color: #f7f3eb;
+  font-weight: 800;
+}
+
+.contactForm button:disabled {
+  background: #9aa39a;
+  cursor: not-allowed;
+}
+
+.formStatus {
+  margin: 0;
+  font-weight: 700;
+}
+
+.formStatus.ok {
+  color: #2f6b3a;
+}
+
+.formStatus.error {
+  color: #a3341f;
+}
+
 @media (max-width: 980px) {
   .shell,
   .contentGrid,
