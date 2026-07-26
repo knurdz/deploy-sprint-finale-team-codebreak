@@ -32,7 +32,7 @@ Use this section for short public notes and links. Full task instructions and ch
 | --- | --- | --- | --- |
 | T01 |  |  |  |
 | T02 |  |  |  |
-| T03 |  |  |  |
+| T03 |  |  | `deploy.yml` downloads the CI-built `site-dist-<sha>` artifact (via `actions/download-artifact@v4`, resolving the source CI run from the `workflow_run` event or the GitHub API) instead of rebuilding, writes `release-candidate/artifact.json` recording task/artifact/commit/CI-run-id, publishes it as job summary + `release-manifest-<sha>` artifact, and forwards the artifact identity in the organizer dispatch payload. |
 | T04 |  |  |  |
 | T05 |  |  |  |
 | T06 |  |  |  |
