@@ -18,11 +18,13 @@ import { StatCard } from './components/StatCard';
 import { courses } from './data/courses';
 import { deadlineCards } from './data/deadlines';
 import { sprintStats } from './data/stats';
+import { featureFlags } from './utils/featureFlags';
 import { getAverageProgress } from './utils/metrics';
 import { ReleaseReadiness } from './components/ReleaseReadiness';
 
 export function App() {
   const averageProgress = getAverageProgress(courses);
+  const { showInsights } = featureFlags();
 
   return (
     <main className="shell">
@@ -104,7 +106,7 @@ export function App() {
           ))}
         </section>
 
-        <LearningVelocity courses={courses} />
+        {showInsights && <LearningVelocity courses={courses} />}
 
         <section className="contentGrid">
           <div className="panel" id="courses">
