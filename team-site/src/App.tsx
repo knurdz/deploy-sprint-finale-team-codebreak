@@ -17,6 +17,7 @@ import { courses } from './data/courses';
 import { deadlineCards } from './data/deadlines';
 import { sprintStats } from './data/stats';
 import { getAverageProgress } from './utils/metrics';
+import { ReleaseReadiness } from './components/ReleaseReadiness';
 
 export function App() {
   const averageProgress = getAverageProgress(courses);
@@ -117,6 +118,8 @@ export function App() {
           </div>
 
           <DeadlineBoard deadlines={deadlineCards} />
+          <ReleaseReadiness />
+
         </section>
       </section>
     </main>

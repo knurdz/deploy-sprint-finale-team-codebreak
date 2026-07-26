@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/generate-status.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/generate-status.mjs && npm run check:readiness",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "check:readiness": "node scripts/check-release-readiness.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.23.0",
