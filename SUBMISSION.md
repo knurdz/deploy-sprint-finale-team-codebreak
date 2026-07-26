@@ -37,7 +37,7 @@ Use this section for short public notes and links. Full task instructions and ch
 | T05 |  |  |  |
 | T06 |  |  | `ci.yml` already ran on `pull_request` + push to `main` with Node 20, `npm ci`, `npm run build`, and `upload-artifact` (`site-dist-<sha>`) from prior tasks; added `permissions: contents: read` (least privilege) and a `concurrency` group with `cancel-in-progress` so stale runs on the same ref don't linger. `deploy.yml` already depends on this build via its `workflow_run: ["CI"]` trigger gated on `conclusion == 'success'`, unchanged here. |
 | T07 |  |  |  |
-| T08 |  |  |  |
+| T08 |  |  | Cherry-picked the single commit from organizer branch `task-assets/rebase-feature` (`Add rebase feature asset` — new `LearningVelocity` dashboard section) onto `main`; its history was already based on our current `main`, so it applied with no conflicts and no force-push. `git diff main` on this branch matches the organizer commit's diff exactly (3 files, `App.tsx`/`LearningVelocity.tsx`/`styles.css`). Verified with `tsc --noEmit && vite build` locally — build passes. |
 | T09 |  |  |  |
 | T10 |  |  |  |
 | T11 |  |  |  |
