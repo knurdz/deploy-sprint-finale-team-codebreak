@@ -19,6 +19,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: domain-check-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Verify DNS, HTTPS, HTTP, and raw IP evidence
