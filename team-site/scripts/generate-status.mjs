@@ -12,6 +12,7 @@ const deployTime = new Date().toISOString();
 
 const publicUrl = process.env.VITE_PUBLIC_URL || null;
 const domainConnected = Boolean(publicUrl && publicUrl.startsWith('https://'));
+const web3FormsConfigured = Boolean(process.env.VITE_WEB3FORMS_ACCESS_KEY);
 
 const statusDir = join(distDir, 'status');
 const healthDir = join(distDir, 'health');
@@ -27,6 +28,10 @@ const status = {
   domain: {
     publicUrl,
     connected: domainConnected,
+  },
+  contact: {
+    provider: 'web3forms',
+    configured: web3FormsConfigured,
   },
 };
 
