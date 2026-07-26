@@ -21,12 +21,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        id: setup-node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: team-site/package-lock.json
+
+      - name: Cache npm dependencies
+        id: npm-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('team-site/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install dependencies
         run: npm ci
@@ -37,8 +43,8 @@ jobs:
           {
             echo "### Dependency cache"
             echo ""
-            echo "- Cache key based on: \`team-site/package-lock.json\`"
-            echo "- Cache hit: \`${{ steps.setup-node.outputs.cache-hit }}\`"
+            echo "- Cache key: \`${{ runner.os }}-npm-${{ hashFiles('team-site/package-lock.json') }}\`"
+            echo "- Cache hit: \`${{ steps.npm-cache.outputs.cache-hit }}\`"
             echo "- Install command: \`npm ci\` (lockfile-strict, unchanged)"
           } >> "$GITHUB_STEP_SUMMARY"
 
