@@ -1,0 +1,151 @@
+name: Domain Connectivity Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: Assigned domain (FQDN) to verify
+        required: true
+        default: codebreak.deploysprint-finals.knurdz.org
+      expected_ip:
+        description: Expected A record target (raw IP)
+        required: true
+        default: 20.114.3.230
+      txt_name:
+        description: TXT verification record name (FQDN)
+        required: true
+        default: _deploy-sprint-challenge.codebreak.deploysprint-finals.knurdz.org
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Verify DNS, HTTPS, HTTP, and raw IP evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ensure dig is available
+        run: command -v dig >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq dnsutils)
+
+      - name: Run connectivity checks
+        id: checks
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          EXPECTED_IP: ${{ inputs.expected_ip }}
+          TXT_NAME: ${{ inputs.txt_name }}
+          DNS_TXT_VALUE: ${{ secrets.DNS_TXT_VALUE }}
+        run: |
+          set -uo pipefail
+
+          summary="$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Domain connectivity evidence"
+            echo ""
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+          } >> "$summary"
+
+          pass_count=0
+          total=0
+
+          record_result() {
+            local label="$1"
+            local ok="$2"
+            local detail="$3"
+            total=$((total + 1))
+            if [ "$ok" = "true" ]; then
+              pass_count=$((pass_count + 1))
+              echo "PASS: $label ($detail)"
+              echo "| $label | ✅ $detail |" >> "$summary"
+            else
+              echo "FAIL: $label ($detail)"
+              echo "| $label | ❌ $detail |" >> "$summary"
+            fi
+          }
+
+          # A record resolution
+          resolved_ip=$(dig +short A "$DOMAIN" | tail -n1)
+          if [ "$resolved_ip" = "$EXPECTED_IP" ]; then
+            record_result "A record resolves" "true" "$DOMAIN -> $resolved_ip"
+          else
+            record_result "A record resolves" "false" "$DOMAIN -> '${resolved_ip:-<none>}', expected $EXPECTED_IP"
+          fi
+
+          # TXT verification record (compare without printing the secret value)
+          resolved_txt=$(dig +short TXT "$TXT_NAME")
+          if [ -n "$DNS_TXT_VALUE" ] && printf '%s' "$resolved_txt" | grep -qF "$DNS_TXT_VALUE"; then
+            record_result "TXT verification record" "true" "$TXT_NAME matches expected value"
+          else
+            record_result "TXT verification record" "false" "$TXT_NAME did not match expected value"
+          fi
+
+          # HTTPS on the assigned domain
+          https_code=$(curl -k -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$DOMAIN" || echo "000")
+          if [ "$https_code" -ge 200 ] 2>/dev/null && [ "$https_code" -lt 400 ]; then
+            record_result "HTTPS domain responds" "true" "https://$DOMAIN -> $https_code"
+          else
+            record_result "HTTPS domain responds" "false" "https://$DOMAIN -> $https_code"
+          fi
+
+          # Plain HTTP on the assigned domain
+          http_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://$DOMAIN" || echo "000")
+          if [ "$http_code" -ge 200 ] 2>/dev/null && [ "$http_code" -lt 400 ]; then
+            record_result "HTTP domain responds" "true" "http://$DOMAIN -> $http_code"
+          else
+            record_result "HTTP domain responds" "false" "http://$DOMAIN -> $http_code"
+          fi
+
+          # Raw IP over HTTP
+          ip_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://$EXPECTED_IP" || echo "000")
+          if [ "$ip_code" -ge 200 ] 2>/dev/null && [ "$ip_code" -lt 400 ]; then
+            record_result "Raw IP HTTP responds" "true" "http://$EXPECTED_IP -> $ip_code"
+          else
+            record_result "Raw IP HTTP responds" "false" "http://$EXPECTED_IP -> $ip_code"
+          fi
+
+          # Host-header dry run: force the assigned hostname to resolve to the
+          # expected IP, to prove the deployer already routes/terminates TLS
+          # for this domain even if public DNS hasn't finished propagating.
+          dryrun_code=$(curl -k -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$DOMAIN:443:$EXPECTED_IP" "https://$DOMAIN" || echo "000")
+          if [ "$dryrun_code" -ge 200 ] 2>/dev/null && [ "$dryrun_code" -lt 400 ]; then
+            record_result "Host-header dry run (--resolve)" "true" "https://$DOMAIN via $EXPECTED_IP -> $dryrun_code"
+          else
+            record_result "Host-header dry run (--resolve)" "false" "https://$DOMAIN via $EXPECTED_IP -> $dryrun_code"
+          fi
+
+          {
+            echo ""
+            echo "$pass_count / $total checks passed."
+          } >> "$summary"
+
+          echo "pass_count=$pass_count" >> "$GITHUB_OUTPUT"
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+
+      - name: Write domain-check manifest
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          PASS_COUNT: ${{ steps.checks.outputs.pass_count }}
+          TOTAL: ${{ steps.checks.outputs.total }}
+        run: |
+          set -euo pipefail
+          printf '{"task":"T02","domain":"%s","checksPassed":%s,"checksTotal":%s,"commit":"%s"}\n' \
+            "$DOMAIN" "$PASS_COUNT" "$TOTAL" "$GITHUB_SHA" > domain-check.json
+          cat domain-check.json
+
+      - name: Upload domain-check manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: domain-check-${{ github.sha }}-${{ github.run_id }}
+          path: domain-check.json
+
+      - name: Fail if nothing responded
+        env:
+          PASS_COUNT: ${{ steps.checks.outputs.pass_count }}
+        run: |
+          set -euo pipefail
+          if [ "$PASS_COUNT" -eq 0 ]; then
+            echo "None of the connectivity checks passed."
+            exit 1
+          fi
