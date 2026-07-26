@@ -1,0 +1,171 @@
+name: Rollback To Known-Good Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Known-good tag, commit SHA, or artifact id (e.g. site-dist-<sha>) to redeploy
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: request-organizer-deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Roll back to known-good release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve rollback target
+        id: target
+        env:
+          RELEASE_REF: ${{ inputs.release_ref }}
+        run: |
+          set -euo pipefail
+
+          test -n "$RELEASE_REF"
+
+          ref="${RELEASE_REF#site-dist-}"
+
+          if ! sha=$(git rev-parse --verify "${ref}^{commit}" 2>/dev/null); then
+            echo "release_ref '$RELEASE_REF' does not resolve to a known commit."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "Commit $sha is not on main; refusing to roll back to a non-release commit."
+            exit 1
+          fi
+
+          artifact_name="site-dist-${sha}"
+
+          echo "Resolved release_ref '$RELEASE_REF' -> commit $sha (artifact $artifact_name)"
+
+          {
+            echo "sha=$sha"
+            echo "artifact_name=$artifact_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve CI run for artifact
+        id: ci_run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          run_id=$(gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&status=success&per_page=1" \
+            --jq '.workflow_runs[0].id // empty')
+
+          if [ -z "$run_id" ]; then
+            echo "No successful CI run (and therefore no artifact) found for commit $SHA."
+            exit 1
+          fi
+
+          echo "Using CI run $run_id as the source of artifact for commit $SHA"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download known-good artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.target.outputs.artifact_name }}
+          path: ./release-candidate
+          run-id: ${{ steps.ci_run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify artifact contents
+        run: |
+          set -euo pipefail
+          ls -la release-candidate
+          test -f release-candidate/index.html
+
+      - name: Record rollback manifest
+        env:
+          RELEASE_REF: ${{ inputs.release_ref }}
+          SHA: ${{ steps.target.outputs.sha }}
+          ARTIFACT_NAME: ${{ steps.target.outputs.artifact_name }}
+          CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
+          TRIGGERED_BY: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+
+          printf '{"task":"T04","action":"rollback","releaseRef":"%s","commit":"%s","artifact":"%s","ciRunId":"%s","triggeredBy":"%s"}\n' \
+            "$RELEASE_REF" "$SHA" "$ARTIFACT_NAME" "$CI_RUN_ID" "$TRIGGERED_BY" > release-candidate/rollback-manifest.json
+
+          cat release-candidate/rollback-manifest.json
+
+          {
+            echo "### Rollback target"
+            echo ""
+            echo "- Requested release_ref: \`${RELEASE_REF}\`"
+            echo "- Resolved commit: \`${SHA}\`"
+            echo "- Artifact: \`${ARTIFACT_NAME}\`"
+            echo "- Source CI run: \`${CI_RUN_ID}\`"
+            echo "- Triggered by: \`${TRIGGERED_BY}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload rollback manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-manifest-${{ steps.target.outputs.sha }}-${{ github.run_id }}
+          path: release-candidate/rollback-manifest.json
+
+      - name: Request rollback deploy from organizer deployer
+        env:
+          DEPLOYER_DISPATCH_TOKEN: ${{ secrets.DEPLOYER_DISPATCH_TOKEN }}
+          DEPLOYER_REPO: knurdz/deploy-sprint-deployer
+          TEAM_REPO: ${{ github.repository }}
+          TEAM_SHA: ${{ steps.target.outputs.sha }}
+          ARTIFACT_NAME: ${{ steps.target.outputs.artifact_name }}
+          SOURCE_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
+          RELEASE_REF: ${{ inputs.release_ref }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DEPLOYER_DISPATCH_TOKEN" ]; then
+            echo "DEPLOYER_DISPATCH_TOKEN is not configured."
+            exit 1
+          fi
+
+          python3 - <<'PY' > payload.json
+          import json
+          import os
+
+          payload = {
+              "event_type": "team-codebreak-main-merged",
+              "client_payload": {
+                  "team": "codebreak",
+                  "repo": os.environ["TEAM_REPO"],
+                  "sha": os.environ["TEAM_SHA"],
+                  "branch": "main",
+                  "source_run_id": os.environ["SOURCE_RUN_ID"],
+                  "artifact_name": os.environ["ARTIFACT_NAME"],
+                  "rollback": True,
+                  "release_ref": os.environ["RELEASE_REF"],
+              },
+          }
+
+          print(json.dumps(payload))
+          PY
+
+          curl --fail-with-body --show-error --silent \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${DEPLOYER_DISPATCH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${DEPLOYER_REPO}/dispatches" \
+            --data @payload.json
+
+          echo "Requested rollback deployment for ${TEAM_REPO}@${TEAM_SHA} (release_ref: ${RELEASE_REF})."
