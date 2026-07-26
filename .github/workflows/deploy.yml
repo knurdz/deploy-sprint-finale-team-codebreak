@@ -39,8 +39,15 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           MANUAL_SHA: ${{ github.sha }}
           MANUAL_RUN_ID: ${{ github.run_id }}
-        run: |
+                run: |
           set -euo pipefail
+
+          lock_dir="/tmp/deploy-sprint-team.lock"
+          if ! mkdir "$lock_dir"; then
+            echo "T28 another deploy is running"
+            exit 1
+          fi
+          trap 'rmdir "$lock_dir"' EXIT
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             sha="$MANUAL_SHA"
