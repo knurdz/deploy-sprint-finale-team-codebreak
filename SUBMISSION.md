@@ -4,7 +4,7 @@ Complete this file on `main` as tasks are completed. Do not paste secrets, priva
 
 ## Team
 
-- Team name:
+- Team name: CodeBreak
 - Team members:
 - Live IP URL:
 - Assigned domain URL:
@@ -30,7 +30,7 @@ Use this section for short public notes and links. Full task instructions and ch
 
 | Task | PR | Evidence | Notes |
 | --- | --- | --- | --- |
-| T01 |  |  |  |
+| T01 | #1 |  | `npm run build` runs `team-site/scripts/generate-status.mjs`, writing `dist/health/index.html` (`ok`) and `dist/status/index.html` (JSON: team, commit SHA, release ID, deploy time, `T01` marker) using `GITHUB_SHA`/`GITHUB_RUN_ID`. CI uploads the artifact; `deploy.yml` dispatches the commit SHA to the organizer's deployer on a successful `main` run. Verify: `IP_PUBLIC_URL/status` commit matches the merged SHA; `IP_PUBLIC_URL/health` returns `ok`. |
 | T02 |  |  |  |
 | T03 |  |  | `deploy.yml` downloads the CI-built `site-dist-<sha>` artifact (via `actions/download-artifact@v4`, resolving the source CI run from the `workflow_run` event or the GitHub API) instead of rebuilding, writes `release-candidate/artifact.json` recording task/artifact/commit/CI-run-id, publishes it as job summary + `release-manifest-<sha>` artifact, and forwards the artifact identity in the organizer dispatch payload. |
 | T04 |  |  | New `rollback.yml` (`workflow_dispatch` with required `release_ref` input) resolves a tag/SHA/artifact-id to a commit on `main`, locates its successful CI run, downloads the matching `site-dist-<sha>` artifact, records a rollback manifest (job summary + `rollback-manifest-<sha>-<run>` artifact), and dispatches the same organizer redeploy request used by `deploy.yml`, pointed at the known-good commit. |
